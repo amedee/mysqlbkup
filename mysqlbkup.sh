@@ -8,16 +8,16 @@
 # A simple MySQL backup script in BASH.
 #
 # All it does is loop over every database and create a backup
-# file.  Every database has its own direcotry beneath the root
+# file. Every database has its own direcotry beneath the root
 # backup directory, $BACKUP_DIR.
 #
-# We're using gzip compression on each backup file and
-# labeling backup files by date.  The number of backup files
+# We're using xz compression on each backup file and
+# labeling backup files by date. The number of backup files
 # per db is controlled by $MAX_BACKUPS.
 #
-# The script is intended to be run by a cron job.  It echos
+# The script is intended to be run by a cron job. It echos
 # messages to STDOUT which can be redirected to a file for
-# simple logging. 
+# simple logging.
 # --------------------------------------------------------------------------------
 
 platform='unknown'
@@ -65,7 +65,7 @@ if [ ! -d "$BACKUP_DIR" ]; then
 fi
 
 # Check for external dependencies, bail with an error message if any are missing
-for program in date gzip head hostname ls mysql mysqldump rm sed tr wc
+for program in date xz head hostname ls mysql mysqldump rm sed tr wc
 do
     which $program 1>/dev/null 2>/dev/null
     if [ $? -gt 0 ]; then
@@ -94,7 +94,7 @@ echo "== Running $0 on $(hostname) - $date =="; echo
 for db in $dbs
 do
 	backupDir="$BACKUP_DIR/$db"    # full path to the backup dir for $db
-	backupFile="$date-$db.sql.gz"  # filename of backup for $db & $date
+	backupFile="$date-$db.sql.xz"  # filename of backup for $db & $date
 
 	echo "Backing up $db into $backupDir"
 
@@ -105,14 +105,14 @@ do
 		mkdir -p "$backupDir"
 	else
     # nuke any backups beyond $MAX_BACKUPS
-		numBackups=$(ls -1lt "$backupDir"/*.gz | wc -l) # count the number of existing backups for $db
+		numBackups=$(ls -1lt "$backupDir"/*.xz | wc -l) # count the number of existing backups for $db
 		if [ -z "$numBackups" ]; then numBackups=0; fi
 
 		if [ "$numBackups" -gt "$MAX_BACKUPS" ]; then
       # how many files to nuke
 			((numFilesToNuke = "$numBackups - $MAX_BACKUPS + 1"))
       # actual files to nuke
-			filesToNuke=$(ls -1rt "$backupDir"/*.gz | head -n "$numFilesToNuke" | tr '\n' ' ')
+			filesToNuke=$(ls -1rt "$backupDir"/*.xz | head -n "$numFilesToNuke" | tr '\n' ' ')
 
 			echo "Nuking files $filesToNuke"
 			rm $filesToNuke
@@ -120,8 +120,8 @@ do
 	fi
 
 	# create the backup for $db
-	echo "Running: mysqldump --force --opt --routines --triggers --max_allowed_packet=250M --user=$USER --password=******** -H $HOST $db | gzip > $backupDir/$backupFile"
-	mysqldump --force --opt --routines --triggers --max_allowed_packet=250M --user="$USER" --password="$PASS" --host="$HOST" "$db" | gzip > "$backupDir/$backupFile"
+	echo "Running: mysqldump --force --opt --routines --triggers --max_allowed_packet=250M --user=$USER --password=******** -H $HOST $db | xz -9 > $backupDir/$backupFile"
+	mysqldump --force --opt --routines --triggers --max_allowed_packet=250M --user="$USER" --password="$PASS" --host="$HOST" "$db" | xz -9 > "$backupDir/$backupFile"
 	echo
 done
 
